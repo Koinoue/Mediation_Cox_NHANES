@@ -1,0 +1,59 @@
+*Mediation analysis (weighting approach) steps and codes (Stata)
+*"Association of Subclinical Hypothyroidism and Cardiovascular Disease With Mortality" (Inoue et al. JAMA Netw Open 2019)
+/*Created based on mediation code (R) provided in Epidemiology. 2014;25(3):389–396 and BMC medical research methodology, 2014;14.1: 9.*/
+
+<Notation>
+seqn: id number of each observation
+expo: exposure (1: low-normal TSH, 2: middle-normal TSH, 3: high-normal TSH, and 4: subclinical hypothyroidism)
+[cov]: sets of covariates
+med: mediator (0: non-CVD, 1: CVD)
+mort: outcome (0: alive, 1: death)
+permth_exm: time since enrollment (TSH measurement)
+weight: this accounts for the unequal probability of sampling, survey nonresponse and adjustments to population control total.
+sdmvpsu: this accounts for the design effects of clustering.
+sdmvstra: this accounts for the design effects of stratification.
+
+<Steps>
+*Step 1: creating counterfactual datasets (replicate data with different exposures)
+expand 4
+sort seqn
+qui by seqn : gen dup= cond(_N==1, 0, _n)
+qui gen   expstar=1 if dup==1 /*assuming everyone had the exposure level = 1*/
+qui replace expstar=2 if dup==2 /*assuming everyone had the exposure level = 2*/
+qui replace expstar=3 if dup==3 /*assuming everyone had the exposure level = 3*/
+qui replace expstar=4 if dup==4 /*assuming everyone had the exposure level = 4*/
+
+*Step 2: computing weights
+qui gen expTemp = expo /*predict mediator based on the observed exposure level*/
+qui svyset sdmvpsu [pweight =weight], strata(sdmvstra) 
+qui svy: logit med ib2.expTemp [cov]
+qui predict med1 
+qui replace expTemp = expstar /*predict mediator based on the counterfactual exposure level*/
+qui predict med2 
+qui gen weightM = med2/med1 if med==1
+qui replace weightM = (1-med2)/(1-med1) if med==0
+sum weightM /*check the distribution of calculated weight*/
+hist weightM
+
+*Step3: weighted cox model
+qui gen newweight = weight*weightM /*combine the calculated weight with survey weight*/
+qui svyset sdmvpsu [pweight =newweight], strata(sdmvstra)
+qui stset permth_exm, failure(mort) 
+qui svy: stcox ib2.expo##ib2.expstar [cov]
+
+*Step 4: return value
+scalar TE_low = exp(_b[1.expo]+_b[1.expstar]+_b[1.expo#1.expstar]) /*Total effect for low-normal TSH group*/
+scalar DE_low = exp(_b[1.expo]) /*Direct effect for low-normal TSH group*/
+scalar IE_low = exp(_b[1.expstar]+_b[1.expo#1.expstar]) /*Indirect effect for low-normal TSH group*/
+
+scalar TE_high = exp(_b[3.expo]+_b[3.expstar]+_b[3.expo#3.expstar]) /*Total effect for high-normal TSH group*/
+scalar DE_high = exp(_b[3.expo]) /*Direct effect for high-normal TSH group*/
+scalar IE_high = exp(_b[3.expstar]+_b[3.expo#3.expstar]) /*Indirect effect for high-normal TSH group*/
+
+scalar TE_hypo = exp(_b[4.expo]+_b[4.expstar]+_b[4.expo#4.expstar]) /*Total effect for subclinical hypothyroidism group*/
+scalar DE_hypo = exp(_b[4.expo]) /*Direct effect for subclinical hypothyroidism group*/
+scalar IE_hypo = exp(_b[4.expstar]+_b[4.expo#4.expstar]) /*Indirect effect for subclinical hypothyroidism group*/
+
+scalar list
+
+* Bootstrapping is used to estimate 95% bias-corrected confidence interval. %mediated was calculated by log(IE)/log(TE).
