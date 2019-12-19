@@ -1,5 +1,6 @@
+"Association of Subclinical Hypothyroidism and Cardiovascular Disease With Mortality" (Inoue et al. JAMA Netw Open 2019)
+
 *Mediation analysis (weighting approach) steps and codes (Stata)
-*"Association of Subclinical Hypothyroidism and Cardiovascular Disease With Mortality" (Inoue et al. JAMA Netw Open 2019)
 /*Created based on mediation code (R) provided in Epidemiology. 2014;25(3):389–396 and BMC medical research methodology, 2014;14.1: 9.*/
 
 <Notation>
